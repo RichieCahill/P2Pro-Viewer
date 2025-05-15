@@ -1,32 +1,20 @@
-import os
-import threading
+from os.path import basename, dirname, join
+
 from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.stacklayout import StackLayout
-from kivy.uix.anchorlayout import AnchorLayout
-from kivy.uix.image import Image
-from kivy.uix.slider import Slider
-from kivy.uix.button import Button
-from kivy.uix.dropdown import DropDown
-from kivy.uix.label import Label
-from kivy.uix.widget import Widget
+from kivy.clock import Clock, mainthread
+from kivy.core.window import Window
 from kivy.graphics import *
 from kivy.graphics.texture import Texture
-from kivy.clock import Clock, mainthread
 from kivy.lang import Builder
-from kivy.base import EventLoop
-from kivy.core.window import Window
-
-
-from watchdog.observers import Observer
+from kivy.uix.label import Label
+from kivy.uix.widget import Widget
 from watchdog.events import FileSystemEventHandler
-from os.path import dirname, basename, join
+from watchdog.observers import Observer
 
-filename = 'P2Pro/gui.kv'
+filename = "P2Pro/gui.kv"
 PATH = dirname(filename)
 TARGET = basename(filename)
+
 
 class KvHandler(FileSystemEventHandler):
     def __init__(self, callback, target, **kwargs):
@@ -37,7 +25,6 @@ class KvHandler(FileSystemEventHandler):
     def on_any_event(self, event):
         if basename(event.src_path) == self.target:
             self.callback()
-
 
 
 class Scale(Widget):
@@ -65,7 +52,7 @@ class Scale(Widget):
             # Replace this with your own tick logic
             tick_values = [0, 0.25, 0.5, 0.75, 1.0]  # Example tick values
             tick_positions = [(self.pos[0] + 10, self.pos[1] + i * step_height) for i, _ in enumerate(tick_values)]
-            for value, position in zip(tick_values, tick_positions):
+            for value, position in zip(tick_values, tick_positions, strict=False):
                 Label(text=str(value), pos=(position[0] + 15, position[1] - 10), size_hint=(None, None))
                 Line(points=[position[0] + 10, position[1], position[0] + self.width, position[1]], width=1)
 
@@ -81,14 +68,12 @@ class GuiApp(App):
         frame = generate_frame()
 
         # Update image texture
-        texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='luminance', bufferfmt='ushort')
-        texture.blit_buffer(frame.tobytes(), colorfmt='luminance', bufferfmt='ushort')
+        texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt="luminance", bufferfmt="ushort")
+        texture.blit_buffer(frame.tobytes(), colorfmt="luminance", bufferfmt="ushort")
         # print('.', end='')
         # print(dir(self.root.ids))
         # print(self.root.ids.items())
         self.root.ids.image_widget.texture = texture
-    
-
 
     # dev build function, reloads on .kv change
     def build(self):
@@ -115,6 +100,8 @@ class GuiApp(App):
 
 
 import numpy as np
+
+
 def generate_frame():
     # Replace this with your video stream processing logic
     # Here's a dummy example that generates a gradient frame
@@ -122,5 +109,5 @@ def generate_frame():
     return frame
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     GuiApp().run()

@@ -1,36 +1,41 @@
+import logging
+import os
 import threading
 import time
-import os
-import logging
-import keyboard
 
-import P2Pro.video
 import P2Pro.P2Pro_cmd as P2Pro_CMD
 import P2Pro.recorder
+import P2Pro.video
 
 logging.basicConfig()
-logging.getLogger('P2Pro.recorder').setLevel(logging.INFO)
-logging.getLogger('P2Pro.P2Pro_cmd').setLevel(logging.INFO)
+logging.getLogger("P2Pro.recorder").setLevel(logging.INFO)
+logging.getLogger("P2Pro.P2Pro_cmd").setLevel(logging.INFO)
 
 try:
-    print ("Hotkeys:")
-    print ("[q] close openCV window, then close program using [ctrl]+[c]")
-    print ("[s] do NUC")
-    print ("[b] do NUC for background")
-    print ("[d] read shutter state")
-    print ("[l] set low gain (high temperature mode)")
-    print ("[h] set high gain (low temperature mode)")
+    print("Hotkeys:")
+    print("[q] close openCV window, then close program using [ctrl]+[c]")
+    print("[s] do NUC")
+    print("[b] do NUC for background")
+    print("[d] read shutter state")
+    print("[l] set low gain (high temperature mode)")
+    print("[h] set high gain (low temperature mode)")
     cam_cmd = P2Pro_CMD.P2Pro()
 
     vid = P2Pro.video.Video()
-    video_thread = threading.Thread(target=vid.open, args=(cam_cmd, 0, ))
+    video_thread = threading.Thread(
+        target=vid.open,
+        args=(
+            cam_cmd,
+            0,
+        ),
+    )
     video_thread.start()
 
     while not vid.video_running:
         time.sleep(0.01)
 
-    #rec = P2Pro.recorder.VideoRecorder(vid.frame_queue[1], "test")
-    #rec.start()
+    # rec = P2Pro.recorder.VideoRecorder(vid.frame_queue[1], "test")
+    # rec.start()
 
     # print (cam_cmd._dev)
     # cam_cmd._standard_cmd_write(P2Pro_CMD.CmdCode.sys_reset_to_rom)
@@ -45,7 +50,7 @@ try:
     print(cam_cmd.get_device_info(P2Pro_CMD.DeviceInfoType.DEV_INFO_GET_PN))
 
     time.sleep(5)
-    #rec.stop()
+    # rec.stop()
 
     while True:
         # print(vid.frame_queue[0].get(True, 2)) # test
@@ -54,5 +59,4 @@ try:
 except KeyboardInterrupt:
     print("Killing...")
     time.sleep(5)
-    pass
 os._exit(0)
