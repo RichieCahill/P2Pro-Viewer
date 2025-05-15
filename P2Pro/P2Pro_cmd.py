@@ -4,7 +4,6 @@ import struct
 import time
 
 import usb.core
-import usb.util
 
 log = logging.getLogger(__name__)
 
@@ -120,14 +119,19 @@ class CmdCode(enum.IntEnum):
 
 
 class P2Pro:
+    """P2Pro."""
+
     _dev: usb.core.Device
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """__init__."""
         self._dev = usb.core.find(idVendor=0x0BDA, idProduct=0x5830)
-        if self._dev == None:
-            raise FileNotFoundError("Infiray P2 Pro thermal module not found, please connect and try again!")
+        if self._dev is None:
+            error = "Infiray P2 Pro thermal module not found, please connect and try again!"
+            raise FileNotFoundError(error)
 
     def _check_camera_ready(self) -> bool:
+        """_check_camera_ready."""
         """Checks if the camera is ready (i2c_usb_check_access_done in the SDK)
 
         :return: True if the camera is ready
@@ -137,10 +141,12 @@ class P2Pro:
         if ret[0] & 1 == 0 and ret[0] & 2 == 0:
             return True
         if ret[0] & 0xFC != 0:
-            raise UserWarning(f"vdcmd status error {ret[0]:#X}")
+            error = f"vdcmd status error {ret[0]:#X}"
+            raise UserWarning(error)
         return False
 
     def _block_until_camera_ready(self, timeout: int = 5) -> bool:
+        """_block_until_camera_ready."""
         """Blocks until the camera is ready or the timeout is reached
 
         :param timeout: Timeout in seconds
@@ -155,7 +161,8 @@ class P2Pro:
             if time.time() > start + timeout:
                 return False
 
-    def _long_cmd_write(self, cmd: int, p1: int, p2: int, p3: int = 0, p4: int = 0):
+    def _long_cmd_write(self, cmd: int, p1: int, p2: int, p3: int = 0, p4: int = 0) -> None:
+        """_long_cmd_write."""
         data1 = struct.pack("<H", cmd)
         data1 += struct.pack(">HI", p1, p2)
         data2 = struct.pack(">II", p3, p4)
@@ -165,34 +172,36 @@ class P2Pro:
         self._dev.ctrl_transfer(0x41, 0x45, 0x78, 0x1D08, data2)
         self._block_until_camera_ready()
 
-    def _long_cmd_read(self, cmd: int, p1: int, p2: int = 0, p3: int = 0, dataLen: int = 2):
+    def _long_cmd_read(self, cmd: int, p1: int, p2: int = 0, p3: int = 0, data_len: int = 2) -> bytes:
+        """_long_cmd_read."""
         data1 = struct.pack("<H", cmd)
         data1 += struct.pack(">HI", p1, p2)
-        data2 = struct.pack(">II", p3, dataLen)
+        data2 = struct.pack(">II", p3, data_len)
         log.debug(f"l_cmd_r {0x9D00:#x} {data1.hex()}")
         log.debug(f"l_cmd_r {0x1D08:#x} {data2.hex()} ")
         self._dev.ctrl_transfer(0x41, 0x45, 0x78, 0x9D00, data1)
         self._dev.ctrl_transfer(0x41, 0x45, 0x78, 0x1D08, data2)
         self._block_until_camera_ready()
         log.debug(f"l_cmd_r {0x1D10:#x} ...")
-        res = self._dev.ctrl_transfer(0xC1, 0x44, 0x78, 0x1D10, dataLen)
+        res = self._dev.ctrl_transfer(0xC1, 0x44, 0x78, 0x1D10, data_len)
         return bytes(res)
 
-    def _standard_cmd_write(self, cmd: int, cmd_param: int = 0, data: bytes = b"\x00", dataLen: int = -1):
+    def _standard_cmd_write(self, cmd: int, cmd_param: int = 0, data: bytes = b"\x00", data_len: int = -1) -> None:
+        """_standard_cmd_write."""
         """Sends a "standard CMD write" packet
 
         :param cmd: 2 byte CMD code
         :param cmd_param: 4 byte parameter that gets sent together with CMD (for spi_* commands, the address needs to be passed in as big-endian)
         :param data: payload
-        :param dataLen: payload length
+        :param data_len: payload length
         """
-        if dataLen == -1:
-            dataLen = len(data)
+        if data_len == -1:
+            data_len = len(data)
 
         cmd_param = struct.unpack("<I", struct.pack(">I", cmd_param))[0]  # switch endinanness
 
         # If there is no payload, send the 8 byte command immediately
-        if dataLen == 0 or data == b"\x00":
+        if data_len == 0 or data == b"\x00":
             # send 1d00 with cmd
             d = struct.pack("<H", cmd)
             d += struct.pack(">I2x", cmd_param)
@@ -207,7 +216,7 @@ class P2Pro:
         # A "camera command" can be 256 bytes long max, but we can split the data and
         # send more with an incremented address parameter (only spi_read/write actually uses that afaik)
         # (adress parameter is big endian, but others are either little endian or only one byte in initial_data[2])
-        for i in range(0, dataLen, outer_chunk_size):
+        for i in range(0, data_len, outer_chunk_size):
             outer_chunk = data[i : i + outer_chunk_size]
 
             # Send initial "camera command"
@@ -242,15 +251,16 @@ class P2Pro:
 
     # pretty similar to _standard_cmd_write, but a bit simpler
 
-    def _standard_cmd_read(self, cmd: int, cmd_param: int = 0, dataLen: int = 0) -> bytes:
+    def _standard_cmd_read(self, cmd: int, cmd_param: int = 0, data_len: int = 0) -> bytes:
+        """_standard_cmd_read."""
         """Sends a "standard CMD read" packet
 
         :param cmd: 2 byte CMD code
         :param cmd_param: 4 byte parameter that gets sent together with CMD (for spi_* commands, the address needs to be passed in as big-endian)
-        :param dataLen: read length
+        :param data_len: read length
         :return: bytes object containing the read result
         """
-        if dataLen == 0:
+        if data_len == 0:
             return b""
 
         cmd_param = struct.unpack("<I", struct.pack(">I", cmd_param))[0]  # switch endinanness
@@ -259,8 +269,8 @@ class P2Pro:
         outer_chunk_size = 0x100
         # A "camera command" can be 256 bytes long max, but we can split the data and
         # read more with an incremented address parameter (only spi_read/write actually uses that afaik)
-        for i in range(0, dataLen, outer_chunk_size):
-            to_read = min(dataLen - i, outer_chunk_size)
+        for i in range(0, data_len, outer_chunk_size):
+            to_read = min(data_len - i, outer_chunk_size)
             # Send initial "camera command"
             initial_data = struct.pack("<H", cmd)
             initial_data += struct.pack(">IH", cmd_param + i, to_read)
@@ -275,32 +285,40 @@ class P2Pro:
 
         return result
 
-    def pseudo_color_set(self, preview_path: int, color_type: PseudoColorTypes):
+    def pseudo_color_set(self, preview_path: int, color_type: PseudoColorTypes) -> None:
+        """pseudo_color_set."""
         self._standard_cmd_write((CmdCode.pseudo_color | CmdDir.SET), preview_path, struct.pack("<B", color_type))
 
     def pseudo_color_get(self, preview_path: int = 0) -> PseudoColorTypes:
+        """pseudo_color_get."""
         res = self._standard_cmd_read(CmdCode.pseudo_color, preview_path, 1)
         return PseudoColorTypes(int.from_bytes(res, "little"))
 
-    def shutter_sta_set(self, sta_type: ShutterStaTypes):
+    def shutter_sta_set(self, sta_type: ShutterStaTypes) -> None:
+        """shutter_sta_set."""
         self._standard_cmd_write(CmdCode.shutter_sta_set, sta_type)
 
-    def shutter_sta_get(self):
+    def shutter_sta_get(self) -> tuple[int, int]:
+        """shutter_sta_get."""
         res = self._standard_cmd_read(CmdCode.shutter_sta_get, 0, 2)
         return res[0], res[1]
 
-    def shutter_switch(self, manual_type: ShutterManualTypes):
+    def shutter_switch(self, manual_type: ShutterManualTypes) -> None:
+        """shutter_switch."""
         self._standard_cmd_write(CmdCode.shutter_switch, manual_type)
 
-    def ooc_b_update(self, update_type: OocBUpdateTypes):
+    def ooc_b_update(self, update_type: OocBUpdateTypes) -> None:
+        """ooc_b_update."""
         self._standard_cmd_write(CmdCode.ooc_b_update, update_type)
 
-    def shutter_actuate(self):
+    def shutter_actuate(self) -> None:
+        """shutter_actuate."""
         log.info("Shutter")
         self.shutter_sta_set(ShutterStaTypes.SHUTTER_CTL_EN)
         self.ooc_b_update(OocBUpdateTypes.B_UPDATE)
 
     def shutter_param_set(self):
+        """shutter_param_set."""
         log.info("Shutter parameter set")
         # ====================================================================
         # IMPORTANT NOTICE
@@ -310,20 +328,23 @@ class P2Pro:
         # the next line is an example on how to deactivate auto shutter update
         # res = self._long_cmd_write(CmdCode.auto_shutter_params_set, PropAutoShutterParams.SHUTTER_PROP_SWITCH, 0)
 
-    def shutter_params_print(self):
+    def shutter_params_print(self) -> None:
+        """shutter_params_print."""
         log.info("Shutter parameters")
         for i in range(12):
             res = self._long_cmd_read(CmdCode.auto_shutter_params_get, i)
-            log.info(PropAutoShutterParams(i).name + ": " + str(res[0]) + " " + str(res[1]))
+            log.info(f"{PropAutoShutterParams(i).name}: {res[0]} {res[1]}")
 
-    def shutter_background(self):
+    def shutter_background(self) -> None:
+        """shutter_background."""
         log.info("Shutter background")
         self.shutter_sta_set(ShutterStaTypes.SHUTTER_CTL_DIS)
         self.shutter_switch(ShutterManualTypes.SHUTTER_OPEN)
         self.ooc_b_update(OocBUpdateTypes.B_UPDATE)
         self.shutter_sta_set(ShutterStaTypes.SHUTTER_CTL_EN)
 
-    def get_shutter_state(self):
+    def get_shutter_state(self) -> tuple[int, int]:
+        """get_shutter_state."""
         sta_type, smt_type = self.shutter_sta_get()
         if smt_type == 0:  # 0 = closed, 1 = open
             log.info("Shutter state: closed")
@@ -335,21 +356,25 @@ class P2Pro:
             log.info("Shutter control: enabled")
         return smt_type, sta_type
 
-    def gain_set_low(self):
+    def gain_set_low(self) -> None:
+        """gain_set_low."""
         log.info("low gain")
         self.set_prop_tpd_params(PropTpdParams.TPD_PROP_GAIN_SEL, 0)
 
-    def gain_set_high(self):
+    def gain_set_high(self) -> None:
+        """gain_set_high."""
         log.info("high gain")
         self.set_prop_tpd_params(PropTpdParams.TPD_PROP_GAIN_SEL, 1)
 
-    def set_prop_tpd_params(self, tpd_param: PropTpdParams, value: int):
+    def set_prop_tpd_params(self, tpd_param: PropTpdParams, value: int) -> None:
+        """set_prop_tpd_params."""
         self._long_cmd_write(CmdCode.prop_tpd_params | CmdDir.SET, tpd_param, value)
 
     def get_prop_tpd_params(self, tpd_param: PropTpdParams) -> int:
+        """get_prop_tpd_params."""
         res = self._long_cmd_read(CmdCode.prop_tpd_params, tpd_param)
         return struct.unpack(">H", res)[0]
 
-    def get_device_info(self, dev_info: DeviceInfoType):
-        res = self._standard_cmd_read(CmdCode.get_device_info, dev_info, DeviceInfoType_len[dev_info])
-        return res
+    def get_device_info(self, dev_info: DeviceInfoType) -> bytes:
+        """get_device_info."""
+        return self._standard_cmd_read(CmdCode.get_device_info, dev_info, DeviceInfoType_len[dev_info])

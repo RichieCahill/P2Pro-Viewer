@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import logging
-import os
 import queue
-import subprocess
 import threading
 import time
 import wave
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import ffmpeg
 import numpy as np
@@ -12,11 +14,15 @@ import pyaudio
 
 from P2Pro import util
 
+if TYPE_CHECKING:
+    import subprocess
+
 log = logging.getLogger(__name__)
 
 
 class AudioRecorder:
     def __init__(self, path):
+        """__init__."""
         self.WAVE_OUTPUT_FILENAME = path + ".wav"
         self.CHUNK = 1024
         self.FORMAT = pyaudio.paInt16
@@ -38,12 +44,14 @@ class AudioRecorder:
         self.thread = None
 
     def start(self):
+        """Start."""
         self.recording = True
         t = threading.Thread(target=self.record)
         t.start()
         self.thread = t
 
     def stop(self):
+        """Stop."""
         self.recording = False
         self.thread.join()
         self.stream.stop_stream()
@@ -52,6 +60,7 @@ class AudioRecorder:
         self.wf.close()
 
     def record(self):
+        """Record."""
         while self.recording:
             data = self.stream.read(self.CHUNK)
             self.wf.writeframes(data)
@@ -59,6 +68,7 @@ class AudioRecorder:
 
 class VideoRecorder:
     def __init__(self, input_queue: queue.Queue, path: str, radiometry: bool = True, audio: bool = True):
+        """__init__."""
         self.rec_running = False
         self.thread: threading.Thread = None
 
@@ -68,10 +78,11 @@ class VideoRecorder:
         self.with_audio = audio
 
     def capture_still(self, path: str):
+        """Capture_still."""
         # R-JPEG?
-        pass
 
-    def rec_thread(self):
+    def rec_thread(self) -> None:
+        """Rec_thread."""
         while self.input_queue.empty():
             time.sleep(0.01)
 
@@ -155,22 +166,24 @@ class VideoRecorder:
         log.debug(err.decode("utf-8"))
 
         try:
-            os.remove(self.path + ".rgb.mkv")
+            Path.unlink(self.path + ".rgb.mkv")
             if self.with_radiometry:
-                os.remove(self.path + ".therm.mkv")
+                Path.unlink(self.path + ".therm.mkv")
             if self.with_audio:
-                os.remove(self.path + ".wav")
+                Path.unlink(self.path + ".wav")
         except FileNotFoundError:
             log.warning("Failed to remove one or more temporary recording files")
 
         log.info("Recording finished.")
 
-    def start(self):
+    def start(self) -> None:
+        """Start."""
         log.info(f"Starting video recording to file {self.path + '.mkv'} ...")
         self.rec_running = True
         self.rec_thread = threading.Thread(target=self.rec_thread)
         self.rec_thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
+        """Stop."""
         self.rec_running = False
         log.info("Stopping video recording, merging temp files...")
