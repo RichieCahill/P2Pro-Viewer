@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "python playground"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.13"
+keyboard = "*"
+pyusb = "*"
+opencv-python = "*"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+select = ["ALL"]
+target-version = "py311"
+
+line-length = 120
+
+
+ignore = [
+    "G004", # Logging statement uses f-string (PERM: I use f-string in logging)
+    "D400", # First line should end with a period (PERM: I don't do this)
+    "D415", # First line should end with a period (PERM: I don't do this)
+    "T201", # Use of print statement (PERM: All this code is from experiment and testing)
+    "T203", # Use of pprint statement (PERM: All this code is from experiment and testing)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-builtins]
+builtins-ignorelist = ["id"]
