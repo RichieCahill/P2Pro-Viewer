@@ -9,6 +9,8 @@ log = logging.getLogger(__name__)
 
 
 class PseudoColorTypes(enum.IntEnum):
+    """PseudoColorTypes."""
+
     PSEUDO_WHITE_HOT = 1
     PSEUDO_RESERVED = 2
     PSEUDO_IRON_RED = 3
@@ -34,22 +36,30 @@ class PseudoColorTypes(enum.IntEnum):
 
 
 class ShutterStaTypes(enum.IntEnum):
+    """ShutterStaTypes."""
+
     SHUTTER_CTL_DIS = 0
     SHUTTER_CTL_EN = 1
 
 
 class ShutterManualTypes(enum.IntEnum):
+    """ShutterManualTypes."""
+
     SHUTTER_OPEN = 0
     SHUTTER_CLOSE = 1
 
 
 class OocBUpdateTypes(enum.IntEnum):
+    """OocBUpdateTypes."""
+
     B_UPDATE = 0  # update B value
     OOC_UPDATE = 1  # update OOC value
     OOC_B_UPDATE = 2  # update both B and OOC value
 
 
 class PropTpdParams(enum.IntEnum):
+    """PropTpdParams."""
+
     TPD_PROP_DISTANCE = 0  # 1/163.835 m, 0-32767, Distance
     TPD_PROP_TU = 1  # 1 K, 0-1024, Reflection temperature
     TPD_PROP_TA = 2  # 1 K, 0-1024, Atmospheric temperature
@@ -59,6 +69,8 @@ class PropTpdParams(enum.IntEnum):
 
 
 class PropAutoShutterParams(enum.IntEnum):
+    """PropAutoShutterParams."""
+
     SHUTTER_PROP_SWITCH = 0  # Auto shutter update switch. 0:OFF, 1:ON
     SHUTTER_PROP_MIN_INTERVAL = (
         1  # Auto shutter minimun interval,to prevent updates too frequently. unit:1s, range:5-655
@@ -79,6 +91,8 @@ class PropAutoShutterParams(enum.IntEnum):
 
 
 class DeviceInfoType(enum.IntEnum):
+    """DeviceInfoType."""
+
     DEV_INFO_CHIP_ID = 0
     DEV_INFO_FW_COMPILE_DATE = 1
     DEV_INFO_DEV_QUALIFICATION = 2
@@ -94,11 +108,15 @@ DeviceInfoType_len = [8, 8, 8, 26, 4, 50, 48, 16, 4]  # crudely implement the di
 
 
 class CmdDir(enum.IntFlag):
+    """CmdDir."""
+
     GET = 0x0000
     SET = 0x4000
 
 
 class CmdCode(enum.IntEnum):
+    """CmdCode."""
+
     sys_reset_to_rom = 0x0805
     spi_transfer = 0x8201
     get_device_info = 0x8405
@@ -119,6 +137,8 @@ class CmdCode(enum.IntEnum):
 
 
 class P2Pro:
+    """P2Pro."""
+
     """P2Pro."""
 
     _dev: usb.core.Device

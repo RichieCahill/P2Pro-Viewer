@@ -1,6 +1,6 @@
 import logging
 import os
-import threading
+from threading import Thread
 import time
 
 import P2Pro.P2Pro_cmd as P2Pro_CMD
@@ -12,21 +12,14 @@ logging.getLogger("P2Pro.recorder").setLevel(logging.INFO)
 logging.getLogger("P2Pro.P2Pro_cmd").setLevel(logging.INFO)
 
 try:
-    print("Hotkeys:")
-    print("[q] close openCV window, then close program using [ctrl]+[c]")
-    print("[s] do NUC")
-    print("[b] do NUC for background")
-    print("[d] read shutter state")
-    print("[l] set low gain (high temperature mode)")
-    print("[h] set high gain (low temperature mode)")
     cam_cmd = P2Pro_CMD.P2Pro()
 
     vid = P2Pro.video.Video()
-    video_thread = threading.Thread(
+    video_thread = Thread(
         target=vid.open,
         args=(
             cam_cmd,
-            0,
+            -1,
         ),
     )
     video_thread.start()
@@ -34,15 +27,15 @@ try:
     while not vid.video_running:
         time.sleep(0.01)
 
-    # rec = P2Pro.recorder.VideoRecorder(vid.frame_queue[1], "test")
+    # rec = P2Pro.recorder.VideoRecorder(vid.frame_queues[1], "test",audio=False)
     # rec.start()
 
-    # print (cam_cmd._dev)
+    # print(cam_cmd._dev)
     # cam_cmd._standard_cmd_write(P2Pro_CMD.CmdCode.sys_reset_to_rom)
     # print(cam_cmd._standard_cmd_read(P2Pro_CMD.CmdCode.cur_vtemp, 0, 2))
     # print(cam_cmd._standard_cmd_read(P2Pro_CMD.CmdCode.shutter_vtemp, 0, 2))
 
-    cam_cmd.pseudo_color_set(0, P2Pro_CMD.PseudoColorTypes.PSEUDO_IRON_RED)
+    cam_cmd.pseudo_color_set(0, P2Pro_CMD.PseudoColorTypes.PSEUDO_RESERVED)
 
     print(cam_cmd.pseudo_color_get())
     # cam_cmd.set_prop_tpd_params(P2Pro_CMD.PropTpdParams.TPD_PROP_GAIN_SEL, 0)
@@ -58,5 +51,5 @@ try:
 
 except KeyboardInterrupt:
     print("Killing...")
-    time.sleep(5)
+    video_thread.join(timeout=0.5)
 os._exit(0)

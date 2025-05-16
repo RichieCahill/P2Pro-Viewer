@@ -1,6 +1,7 @@
 import logging
 import platform
 import queue
+from typing import ClassVar
 
 import cv2
 import numpy as np
@@ -19,12 +20,14 @@ log.setLevel(logging.INFO)
 
 
 class Video:
+    """Video."""
+
     # queue 0 is for GUI, 1 is for recorder
-    frame_queue = [queue.Queue(1) for _ in range(2)]
+    frame_queues: ClassVar[list[queue.Queue]] = [queue.Queue(1) for _ in range(2)]
     video_running = False
 
     @staticmethod
-    def list_cap_ids():
+    def list_cap_ids() -> tuple[list[int], list[int], list[int]]:
         """Test the ports and returns a tuple with the available ports and the ones that are working."""
         non_working_ids = []
         dev_port = 0
@@ -56,9 +59,16 @@ class Video:
             dev_port += 1
         return working_ids, available_ids, non_working_ids
 
-    # Sadly, Windows APIs / OpenCV is very limited, and the only way to detect the camera is by its characteristic resolution and framerate
-    # On Linux, just use the VID/PID via udev
-    def get_P2Pro_cap_id(self):
+    def get_p2pro_cap_id(self) -> int | None:
+        """Get the camera ID from the device name
+
+        On Linux, just use the VID/PID via udev
+        Sadly, Windows APIs / OpenCV is very limited
+        the only way to detect the camera is by its characteristic resolution and framerate
+
+        Returns:
+            int | None: The camera ID or None if not found
+        """
         if platform.system() == "Linux":
             for device in pyudev.Context().list_devices(subsystem="video4linux"):
                 if (
@@ -75,27 +85,59 @@ class Video:
                 return id[0]
         return None
 
-    def open(self, cam_cmd: P2Pro_CMD.P2Pro, camera_id: int | str = -1):
-        if camera_id == -1:
+    def open(self, cam_cmd: P2Pro_CMD.P2Pro, camera_id: int | str | None = None) -> None:
+        """Open the video capture device
+
+        Args:
+            cam_cmd (P2Pro_CMD.P2Pro): The P2Pro command object
+            camera_id (int | str | None, optional): The camera ID. Defaults to None.
+
+        Raises:
+            ConnectionError: If the camera is not found or the video capture device cannot be opened
+        """
+        log.info(
+            "Hotkeys:\n"
+            "[q] close openCV window, then close program using [ctrl]+[c]\n"
+            "[s] do NUC\n"
+            "[b] do NUC for background\n"
+            "[d] read shutter state\n"
+            "[l] set low gain (high temperature mode)\n"
+            "[h] set high gain (low temperature mode)\n"
+            "[m] set shutter parameters\n"
+            "[n] print shutter parameters\n"
+        )
+        hotkeys = {
+            ord("s"): cam_cmd.shutter_actuate,
+            ord("d"): cam_cmd.get_shutter_state,
+            ord("b"): cam_cmd.shutter_background,
+            ord("l"): cam_cmd.gain_set_low,
+            ord("h"): cam_cmd.gain_set_high,
+            ord("m"): cam_cmd.shutter_param_set,
+            ord("n"): cam_cmd.shutter_params_print,
+        }
+
+        if camera_id is None:
             log.info("No camera ID specified, scanning... (This could take a few seconds)")
-            camera_id = self.get_P2Pro_cap_id()
-            if camera_id == None:
-                raise ConnectionError("Could not find camera module")
+            camera_id = self.get_p2pro_cap_id()
+            if camera_id is None:
+                error = "Could not find camera module"
+                raise ConnectionError(error)
 
         # check if video capture can be opened
         cap = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
         if not cap.isOpened():
-            raise ConnectionError(
-                f"Could not open video capture device with index {camera_id}, is the module connected?",
-            )
+            error = f"Could not open video capture device with index {camera_id}, is the module connected?"
+            raise ConnectionError(error)
 
         # check if resolution and FPS matches that of the P2 Pro module
-        cap_res = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-        cap_fps = cap.get(cv2.CAP_PROP_FPS)
-        if cap_res != P2Pro_resolution or cap_fps != P2Pro_fps:
-            raise IndexError(
-                f"Resolution/FPS of camera id {camera_id} doesn't match. It's probably not a P2 Pro. (Got: {cap_res[0]}x{cap_res[1]}@{cap_fps})",
+        capture_resolution = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        capture_fps = cap.get(cv2.CAP_PROP_FPS)
+        if capture_resolution != P2Pro_resolution or capture_fps != P2Pro_fps:
+            error = (
+                f"Resolution/FPS of camera id {camera_id} doesn't match. "
+                f"It's probably not a P2 Pro. (Got: {capture_resolution[0]}x{capture_resolution[1]}@{capture_fps})"
             )
+            raise IndexError(error)
 
         # disable automatic YUY2->RGB conversion of OpenCV
         cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
@@ -109,11 +151,6 @@ class Video:
                 continue
 
             self.video_running = True
-
-            # On Windows, with RGB conversion turned off, OpenCV returns the image as a 2D array with size [1][<imageLen>]. Turn into 1D array.
-            # I think this is required on Linux as well
-            # if platform.system() == "Windows":
-            #     frame = frame[0]
 
             frame = frame.flatten()
 
@@ -143,37 +180,13 @@ class Video:
             key = cv2.waitKey(1)
             if key & 0xFF == ord("q"):
                 break
-            if key & 0xFF == ord("s"):
-                cam_cmd.shutter_actuate()
-            elif key & 0xFF == ord("d"):
-                shutter, auto_mode = cam_cmd.get_shutter_state()
-            elif key & 0xFF == ord("b"):
-                cam_cmd.shutter_background()
-            elif key & 0xFF == ord("l"):
-                cam_cmd.gain_set_low()
-            elif key & 0xFF == ord("h"):
-                cam_cmd.gain_set_high()
-            elif key & 0xFF == ord("m"):
-                cam_cmd.shutter_param_set()
-            elif key & 0xFF == ord("n"):
-                cam_cmd.shutter_params_print()
+            hotkeys.get(key, lambda: None)()
 
             # populate all queues with new frame
-            for queue in self.frame_queue:
+            for frame_queue in self.frame_queues:
                 # if queue is full, discard oldest frame (e.g. if frames not read fast enough or at all)
-                if queue.full():
-                    queue.get(False)
-                queue.put(frame_obj)
+                if frame_queue.full():
+                    frame_queue.get(False)
+                frame_queue.put(frame_obj)
 
             frame_counter += 1
-
-
-if __name__ == "__main__":
-    # test stuff
-
-    # start = time.time()
-    # print("P2 Pro capture ID:", get_P2Pro_cap_id())
-    # print(time.time() - start)
-    logging.basicConfig()
-    log.setLevel(logging.INFO)
-    Video().open()
